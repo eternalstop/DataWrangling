@@ -56,7 +56,13 @@ def float_to_str(x):
 	
 def get_country(country_row):
 	return country_dict.get(country_row['Country / Territory'].lower())
-	
+
+
+def highest_rates(row):
+	# if row['']
+	if row['Total (%)'] > cl_mean and row['CPI 2013 Score'] < cpi_mean:
+		return True
+	return False
 
 workbook = xlrd.open_workbook('data/chp9/unicef_oct_2014.xls')
 sheet = workbook.sheets()[0]
@@ -175,13 +181,37 @@ grp_by_cont = cpi_and_cl.group_by('continent')
 # print(grp_by_cont)
 # for cont, table in grp_by_cont.items():
 # 	print(cont, len(table))
-agg = grp_by_cont.aggregate([
-	('cl_mean', agate.Mean('Total (%)')),
-	('cl_max', agate.Max('Total (%)')),
-	('cpi_median', agate.Median('CPI 2013 Score')),
-	('cpi_min', agate.Min('CPI 2013 Score'))
-])
-agg.print_table()
-agg.print_bars('continent', 'cl_max')
+# agg = grp_by_cont.aggregate([
+# 	('cl_mean', agate.Mean('Total (%)')),
+# 	('cl_max', agate.Max('Total (%)')),
+# 	('cpi_median', agate.Median('CPI 2013 Score')),
+# 	('cpi_min', agate.Min('CPI 2013 Score'))
+# ])
+# agg.print_table()
+# agg.print_bars('continent', 'cl_max')
 
 # 分析数据
+#  分离和聚焦数据
+africa_cpi_cl = cpi_and_cl.where(lambda x: x['continent'] == 'africa')
+
+# for r in africa_cpi_cl.order_by('Total (%)', reverse=True).rows:
+# 	print("{}: {}% - {}%".format(r['Country / Territory'], r['Total (%)'], r['CPI 2013 Score']))
+#
+print(numpy.corrcoef(
+	[float(t) for t in africa_cpi_cl.columns['Total (%)'].values()],
+	[float(c) for c in africa_cpi_cl.columns['CPI 2013 Score'].values()])[0, 1]
+)
+
+africa_cpi_cl = africa_cpi_cl.compute([('Africa Child Labor Rank', agate.Rank('Total (%)', reverse=True)), ])
+africa_cpi_cl = africa_cpi_cl.compute([('Africa CPI Rank', agate.Rank('CPI 2013 Score')), ])
+
+cl_mean = africa_cpi_cl.aggregate(agate.Mean('Total (%)'))
+cpi_mean = africa_cpi_cl.aggregate(agate.Mean('CPI 2013 Score'))
+highest_cpi_cl = africa_cpi_cl.where(lambda x: highest_rates(x))
+
+for r in highest_cpi_cl.rows:
+	print("{}: {}% - {}".format(
+		r['Country / Territory'],
+		r['Total (%)'],
+		r['CPI 2013 Score']
+	))
